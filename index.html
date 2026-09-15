@@ -3,396 +3,230 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>HL5白班 · 授课助手（展台+PPT文本）</title>
+    <title>HL5白班 · 授课助手</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-        }
-
+        * { margin:0; padding:0; box-sizing:border-box; user-select:none; -webkit-tap-highlight-color:transparent; }
         html, body {
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background: white;
-            transition: background-color 1s cubic-bezier(0.45, 0, 0.2, 1);
-            font-family: 'Segoe UI', Roboto, system-ui, 'Helvetica Neue', sans-serif;
+            width:100%; height:100%; overflow:hidden; background:white;
+            transition: background-color 1s cubic-bezier(0.45,0,0.2,1);
+            font-family:'Segoe UI', Roboto, system-ui, 'Helvetica Neue', sans-serif;
         }
+        body.bg-black { background:#0f0f0f; }
 
-        body.bg-black {
-            background: #0f0f0f;
-        }
-
-        /* 开场动画 */
+        /* 开场 */
         .popup {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: #1FAA59;
-            color: white;
-            text-align: center;
-            border-radius: 36px;
-            padding: 2.5rem 2rem;
-            max-width: 560px;
-            width: 85%;
-            box-shadow: 0 25px 40px rgba(0, 0, 0, 0.2);
-            transition: opacity 1s cubic-bezier(0.45, 0, 0.2, 1);
-            opacity: 1;
-            z-index: 2000;
-            pointer-events: none;
+            position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+            background:#1FAA59; color:white; text-align:center; border-radius:36px;
+            padding:2.5rem 2rem; max-width:560px; width:85%;
+            box-shadow:0 25px 40px rgba(0,0,0,0.2);
+            transition:opacity 1s cubic-bezier(0.45,0,0.2,1); opacity:1; z-index:2000; pointer-events:none;
         }
-        .popup.fade-out { opacity: 0; }
-        .popup h1 { font-size: clamp(2.4rem, 9vw, 3.6rem); margin-bottom: 0.4rem; }
-        .popup .sub { font-size: clamp(1.1rem, 4vw, 1.5rem); margin: 0.75rem 0; }
+        .popup.fade-out { opacity:0; }
+        .popup h1 { font-size:clamp(2.4rem,9vw,3.6rem); margin-bottom:0.4rem; }
+        .popup .sub { font-size:clamp(1.1rem,4vw,1.5rem); margin:0.75rem 0; }
         .popup .status {
-            font-size: clamp(1rem, 3.5vw, 1.25rem);
-            margin-top: 1.8rem;
-            display: flex;
-            justify-content: center;
-            background: rgba(255,255,255,0.08);
-            padding: 0.6rem 1.2rem;
-            border-radius: 60px;
-            width: fit-content;
-            margin: 0 auto;
+            font-size:clamp(1rem,3.5vw,1.25rem); margin-top:1.8rem;
+            display:flex; justify-content:center; background:rgba(255,255,255,0.08);
+            padding:0.6rem 1.2rem; border-radius:60px; width:fit-content; margin:0 auto;
         }
         .status-dots span {
-            width: 8px; height: 8px;
-            background: white;
-            border-radius: 50%;
-            display: inline-block;
-            margin: 0 2px;
-            animation: bounceDot 1.2s infinite ease-in-out both;
+            width:8px; height:8px; background:white; border-radius:50%;
+            display:inline-block; margin:0 2px; animation:bounceDot 1.2s infinite ease-in-out both;
         }
-        .status-dots span:nth-child(1) { animation-delay: 0s; background-color: #ffe66d; }
-        .status-dots span:nth-child(2) { animation-delay: 0.2s; background-color: #ffb347; }
-        .status-dots span:nth-child(3) { animation-delay: 0.4s; background-color: #ff8c42; }
+        .status-dots span:nth-child(1){ animation-delay:0s; background:#ffe66d; }
+        .status-dots span:nth-child(2){ animation-delay:0.2s; background:#ffb347; }
+        .status-dots span:nth-child(3){ animation-delay:0.4s; background:#ff8c42; }
         @keyframes bounceDot {
-            0%,80%,100% { transform: scale(0.6); opacity: 0.5; }
-            40% { transform: scale(1.2); opacity: 1; }
+            0%,80%,100%{ transform:scale(0.6); opacity:0.5; }
+            40%{ transform:scale(1.2); opacity:1; }
         }
 
         /* 主界面 */
-        #mainUI {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            display: none;
-            background: transparent;
-            color: white;
-        }
-
-        /* 摄像头视频层（作为背景） */
+        #mainUI { position:relative; width:100%; height:100%; display:none; background:transparent; color:white; }
         .camera-layer {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            z-index: 0;
-            display: none;
+            position:absolute; top:0; left:0; width:100%; height:100%;
+            object-fit:cover; z-index:0; display:none;
         }
-        .camera-layer.active {
-            display: block;
-        }
-
-        /* 画板层 */
+        .camera-layer.active { display:block; }
         #boardCanvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: block;
-            touch-action: none;
-            cursor: crosshair;
-            z-index: 1;
+            position:absolute; top:0; left:0; width:100%; height:100%;
+            display:block; touch-action:none; cursor:crosshair; z-index:1;
         }
-
-        /* PPT文本层 */
         .ppt-text-layer {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 2;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 40px;
-            overflow-y: auto;
-            color: white;
-            font-size: 1.4rem;
-            text-shadow: 1px 1px 2px black;
-            background: rgba(0,0,0,0.4);
-            backdrop-filter: blur(3px);
+            position:absolute; top:0; left:0; width:100%; height:100%;
+            pointer-events:none; z-index:2; display:flex; align-items:center; justify-content:center;
+            padding:40px; overflow-y:auto; color:white; font-size:1.4rem;
+            text-shadow:1px 1px 2px black; background:rgba(0,0,0,0.4); backdrop-filter:blur(3px);
         }
         .ppt-text-content {
-            max-width: 90%;
-            max-height: 80%;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-break: break-word;
+            max-width:90%; max-height:80%; overflow-y:auto;
+            white-space:pre-wrap; word-break:break-word;
         }
-        .ppt-text-layer.hide { display: none; }
+        .ppt-text-layer.hide { display:none; }
 
-        /* 左侧抽屉 */
+        /* 抽屉 */
         .left-toolbar {
-            position: absolute;
-            left: 0;
-            top: 50%;
-            transform: translateY(-50%);
-            display: flex;
-            align-items: center;
-            z-index: 30;
-            pointer-events: none;
+            position:absolute; left:0; top:50%; transform:translateY(-50%);
+            display:flex; align-items:center; z-index:30; pointer-events:none;
         }
         .trigger-btn {
-            width: 48px;
-            height: 48px;
-            background: #2b2b2b;
-            border: 2px solid #4a4a4a;
-            border-radius: 0 30px 30px 0;
-            color: white;
-            font-size: 1.8rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            box-shadow: 2px 4px 10px rgba(0,0,0,0.5);
-            transition: all 0.3s;
-            pointer-events: auto;
-            border-left: none;
+            width:48px; height:48px; background:#2b2b2b; border:2px solid #4a4a4a;
+            border-radius:0 30px 30px 0; color:white; font-size:1.8rem;
+            display:flex; align-items:center; justify-content:center;
+            cursor:pointer; box-shadow:2px 4px 10px rgba(0,0,0,0.5);
+            transition:all 0.3s; pointer-events:auto; border-left:none;
         }
         .trigger-btn.open {
-            border-radius: 30px 0 0 30px;
-            background: #1FAA59;
-            border-color: #1FAA59;
+            border-radius:30px 0 0 30px; background:#1FAA59; border-color:#1FAA59;
         }
         .drawer {
-            background: #1e1e1e;
-            backdrop-filter: blur(10px);
-            border: 1px solid #3a3a3a;
-            border-left: none;
-            border-radius: 0 20px 20px 0;
-            width: 0;
-            max-width: 260px;
-            overflow: hidden;
-            white-space: nowrap;
-            transition: width 0.3s ease-in-out;
-            box-shadow: 4px 4px 15px rgba(0,0,0,0.6);
-            pointer-events: none;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            min-height: 150px;
-            justify-content: center;
-            align-items: center;
+            background:#1e1e1e; backdrop-filter:blur(10px);
+            border:1px solid #3a3a3a; border-left:none; border-radius:0 20px 20px 0;
+            width:0; max-width:260px; overflow:hidden; white-space:nowrap;
+            transition:width 0.3s ease-in-out; box-shadow:4px 4px 15px rgba(0,0,0,0.6);
+            pointer-events:none; display:flex; flex-direction:column; gap:16px;
+            min-height:100px; justify-content:center; align-items:center;
         }
-        .drawer.open {
-            width: 220px;
-            padding: 24px 16px;
-            pointer-events: auto;
-        }
+        .drawer.open { width:200px; padding:24px 16px; pointer-events:auto; }
         .drawer-item {
-            background: #2f2f2f;
-            border: 1px solid #4a4a4a;
-            border-radius: 40px;
-            padding: 12px 18px;
-            color: #eee;
-            font-size: 1.2rem;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            cursor: pointer;
-            width: 100%;
-            justify-content: center;
-            transition: 0.2s;
+            background:#2f2f2f; border:1px solid #4a4a4a; border-radius:40px;
+            padding:14px 20px; color:#eee; font-size:1.2rem;
+            display:flex; align-items:center; justify-content:center; gap:10px;
+            cursor:pointer; width:100%; transition:0.2s;
         }
-        .drawer-item:active { background: #3f3f3f; }
+        .drawer-item:active { background:#3f3f3f; }
 
-        /* 左下角菜单 */
-        .bottom-left {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            z-index: 25;
-        }
+        /* 菜单 */
+        .bottom-left { position:absolute; bottom:20px; left:20px; z-index:25; }
         .menu-btn {
-            background: #2b2b2b;
-            border: 2px solid #4a4a4a;
-            color: white;
-            font-size: 1.3rem;
-            padding: 12px 24px;
-            border-radius: 40px;
-            cursor: pointer;
-            display: flex;
-            gap: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            background:#2b2b2b; border:2px solid #4a4a4a; color:white;
+            font-size:1.3rem; padding:12px 24px; border-radius:40px;
+            cursor:pointer; display:flex; gap:8px; box-shadow:0 4px 12px rgba(0,0,0,0.5);
         }
         .menu-panel {
-            position: absolute;
-            bottom: 80px;
-            left: 0;
-            background: #2d2d2d;
-            border: 1px solid #555;
-            border-radius: 24px;
-            padding: 16px 0;
-            min-width: 220px;
-            display: none;
-            flex-direction: column;
-            z-index: 35;
+            position:absolute; bottom:80px; left:0; background:#2d2d2d;
+            border:1px solid #555; border-radius:24px; padding:16px 0;
+            min-width:220px; display:none; flex-direction:column; z-index:35;
         }
-        .menu-panel.show { display: flex; }
+        .menu-panel.show { display:flex; }
         .menu-item {
-            padding: 14px 24px;
-            color: #eee;
-            font-size: 1.1rem;
-            cursor: pointer;
-            border-bottom: 1px solid #3f3f3f;
+            padding:14px 24px; color:#eee; font-size:1.1rem;
+            cursor:pointer; border-bottom:1px solid #3f3f3f;
         }
-        .menu-item:last-child { border-bottom: none; }
-        .menu-item:active { background: #3f3f3f; }
+        .menu-item:last-child { border-bottom:none; }
+        .menu-item:active { background:#3f3f3f; }
 
-        /* 底部工具条 */
+        /* 工具条 */
         .bottom-center {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 20px;
-            background: rgba(30,30,30,0.8);
-            backdrop-filter: blur(8px);
-            padding: 12px 30px;
-            border-radius: 60px;
-            border: 1px solid #444;
-            z-index: 25;
+            position:absolute; bottom:30px; left:50%; transform:translateX(-50%);
+            display:flex; gap:20px; background:rgba(30,30,30,0.8);
+            backdrop-filter:blur(8px); padding:12px 30px; border-radius:60px;
+            border:1px solid #444; z-index:25;
         }
         .tool-btn {
-            background: transparent;
-            border: none;
-            color: #ddd;
-            font-size: 1.5rem;
-            padding: 10px 20px;
-            border-radius: 40px;
-            cursor: pointer;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-width: 80px;
+            background:transparent; border:none; color:#ddd; font-size:1.5rem;
+            padding:10px 20px; border-radius:40px; cursor:pointer;
+            display:flex; flex-direction:column; align-items:center; min-width:80px;
         }
-        .tool-btn span { font-size: 0.8rem; margin-top: 4px; }
-        .tool-btn.active { background: #1FAA59; color: white; }
+        .tool-btn span { font-size:0.8rem; margin-top:4px; }
+        .tool-btn.active { background:#1FAA59; color:white; }
 
         /* 弹出面板 */
         .tool-popup {
-            position: absolute;
-            bottom: 110px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #2d2d2d;
-            padding: 20px 25px;
-            border-radius: 30px;
-            border: 1px solid #555;
-            display: none;
-            gap: 25px;
-            z-index: 40;
+            position:absolute; bottom:110px; left:50%; transform:translateX(-50%);
+            background:#2d2d2d; padding:20px 25px; border-radius:30px;
+            border:1px solid #555; display:none; gap:25px; z-index:40;
         }
-        .tool-popup.show { display: flex; }
-        .color-palette {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
-        }
+        .tool-popup.show { display:flex; }
+        .color-palette { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
         .color-option {
-            width: 40px; height: 40px;
-            border-radius: 50%;
-            border: 2px solid white;
-            cursor: pointer;
+            width:40px; height:40px; border-radius:50%; border:2px solid white; cursor:pointer;
         }
         .slider-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-            color: white;
-            min-width: 150px;
+            display:flex; flex-direction:column; align-items:center; gap:8px;
+            color:white; min-width:150px;
         }
-        input { width: 100%; }
+        input { width:100%; }
 
-        /* 右下角翻页 */
+        /* 翻页 */
         .bottom-right {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            display: flex;
-            gap: 10px;
-            background: rgba(30,30,30,0.7);
-            backdrop-filter: blur(6px);
-            padding: 8px 18px;
-            border-radius: 50px;
-            border: 1px solid #3a3a3a;
-            z-index: 25;
+            position:absolute; bottom:20px; right:20px; display:flex; gap:10px;
+            background:rgba(30,30,30,0.7); backdrop-filter:blur(6px);
+            padding:8px 18px; border-radius:50px; border:1px solid #3a3a3a; z-index:25;
         }
         .page-btn {
-            background: #2a2a2a;
-            border: none;
-            color: white;
-            font-size: 1.2rem;
-            padding: 8px 16px;
-            border-radius: 40px;
-            cursor: pointer;
-            min-width: 70px;
+            background:#2a2a2a; border:none; color:white; font-size:1.2rem;
+            padding:8px 16px; border-radius:40px; cursor:pointer; min-width:70px;
         }
-        .page-btn:disabled { opacity: 0.3; pointer-events: none; }
+        .page-btn:disabled { opacity:0.3; pointer-events:none; }
         .page-indicator {
-            background: #1e1e1e;
-            padding: 8px 18px;
-            border-radius: 40px;
-            font-size: 1.2rem;
-            border: 1px solid #4a4a4a;
-            cursor: pointer;
+            background:#1e1e1e; padding:8px 18px; border-radius:40px;
+            font-size:1.2rem; border:1px solid #4a4a4a; cursor:pointer;
         }
         .thumbnails-panel {
-            position: absolute;
-            bottom: 100px;
-            right: 20px;
-            background: #252525;
-            border-radius: 24px;
-            padding: 20px;
-            display: none;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            z-index: 45;
+            position:absolute; bottom:100px; right:20px; background:#252525;
+            border-radius:24px; padding:20px; display:none;
+            grid-template-columns:repeat(3,1fr); gap:12px; z-index:45;
         }
-        .thumbnails-panel.show { display: grid; }
+        .thumbnails-panel.show { display:grid; }
         .thumb-item {
-            background: #3a3a3a;
-            aspect-ratio: 4/3;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-            color: #aaa;
-            border: 2px solid transparent;
-            cursor: pointer;
+            background:#3a3a3a; aspect-ratio:4/3; border-radius:12px;
+            display:flex; align-items:center; justify-content:center;
+            font-size:1.2rem; color:#aaa; border:2px solid transparent; cursor:pointer;
         }
-        .thumb-item.active { border-color: #1FAA59; color: white; }
+        .thumb-item.active { border-color:#1FAA59; color:white; }
 
-        @media (max-width: 600px) {
-            .bottom-center { gap: 10px; padding: 10px 20px; }
-            .tool-btn { font-size: 1.2rem; min-width: 60px; padding: 8px 12px; }
-            .page-btn { padding: 6px 12px; font-size: 1rem; min-width: 50px; }
-            .menu-btn { padding: 8px 18px; font-size: 1.1rem; }
+        /* 帮助弹窗 */
+        .help-modal {
+            position:fixed; top:0; left:0; width:100%; height:100%;
+            background:rgba(0,0,0,0.7); display:none;
+            align-items:center; justify-content:center; z-index:1000;
+        }
+        .help-modal.show { display:flex; }
+        .help-content {
+            background:#2d2d2d; border:1px solid #555; border-radius:24px;
+            padding:32px 28px; max-width:480px; width:88%;
+            box-shadow:0 20px 60px rgba(0,0,0,0.8);
+            text-align:center; color:white;
+        }
+        .help-content h2 {
+            font-size:1.6rem; margin-bottom:8px; color:#1FAA59;
+        }
+        .help-content .subtitle {
+            font-size:0.95rem; color:#aaa; margin-bottom:20px;
+        }
+        .help-content .email-box {
+            background:#1e1e1e; border:2px solid #1FAA59; border-radius:14px;
+            padding:16px; margin:16px 0; cursor:pointer;
+            transition:all 0.2s; display:flex; align-items:center; justify-content:center;
+            gap:10px; font-size:1.15rem; font-weight:600;
+            color:#1FAA59; word-break:break-all;
+        }
+        .help-content .email-box:active {
+            background:#2a2a2a; transform:scale(0.98);
+        }
+        .help-content .email-box.copied {
+            background:#1FAA59; color:white; border-color:#1FAA59;
+        }
+        .help-content .email-hint {
+            font-size:0.85rem; color:#888; margin-top:8px;
+        }
+        .help-content .close-btn {
+            margin-top:20px; padding:10px 32px; border-radius:40px;
+            border:1px solid #555; background:transparent; color:#ccc;
+            font-size:1rem; cursor:pointer; transition:0.2s;
+        }
+        .help-content .close-btn:active { background:#3f3f3f; }
+
+        @media (max-width:600px) {
+            .bottom-center { gap:10px; padding:10px 20px; }
+            .tool-btn { font-size:1.2rem; min-width:60px; padding:8px 12px; }
+            .page-btn { padding:6px 12px; font-size:1rem; min-width:50px; }
+            .menu-btn { padding:8px 18px; font-size:1.1rem; }
+            .help-content { padding:24px 20px; }
+            .help-content h2 { font-size:1.3rem; }
+            .help-content .email-box { font-size:1rem; padding:14px 10px; }
         }
     </style>
 </head>
@@ -413,8 +247,7 @@
         <div class="left-toolbar">
             <div class="trigger-btn" id="triggerBtn">▶</div>
             <div class="drawer" id="drawer">
-                <div class="drawer-item" id="cameraBtn">📷 展台</div>
-                <div class="drawer-item" id="whiteboardBtn">✏️ 换回白板模式</div>
+                <div class="drawer-item" id="modeToggleBtn">📷 展台</div>
             </div>
         </div>
 
@@ -424,12 +257,9 @@
                 <div class="menu-item" data-action="saveSingle">📷 保存单页为图片</div>
                 <div class="menu-item" data-action="saveAll">📦 保存所有页为ZIP</div>
                 <div class="menu-item" data-action="open">📂 打开PPTX文件</div>
-                <div class="menu-item" data-action="layout">切换布局样式</div>
+                <div class="menu-item" data-action="help">🆘 帮助 / 建议</div>
                 <div class="menu-item" data-action="about">关于</div>
                 <div class="menu-item version">5.2.3.822</div>
-                <div class="menu-item" data-action="help">帮助</div>
-                <div class="menu-item" data-action="back">返回备课</div>
-                <div class="menu-item" data-action="close">关闭</div>
             </div>
         </div>
 
@@ -471,12 +301,33 @@
         <div class="thumbnails-panel" id="thumbPanel"></div>
     </div>
 
+    <!-- 帮助弹窗 -->
+    <div class="help-modal" id="helpModal">
+        <div class="help-content">
+            <h2>🆘 帮助 / 建议</h2>
+            <div class="subtitle">HL5白班 · 一人 + AI 打造的小工具</div>
+            <p style="color:#ccc; font-size:0.95rem; line-height:1.6;">
+                如果你在使用中遇到问题，<br>
+                或有更好的建议，欢迎邮件联系我。
+            </p>
+            <p style="color:#ff8c42; font-size:0.85rem; margin-top:12px;">
+                ⚠️ 邮件标题请写「帮助」或「建议」等词语<br>
+                否则我可能不会点开看哦～
+            </p>
+            <div class="email-box" id="emailBox" onclick="copyEmail()">
+                📧 Ineedyourhelpofweb@163.com
+            </div>
+            <div class="email-hint">👆 点击上方邮箱即可一键复制</div>
+            <button class="close-btn" onclick="closeHelp()">关闭</button>
+        </div>
+    </div>
+
     <script>
         (function(){
-            // ---- 开场 ----
             const body = document.body;
             const popup = document.getElementById('popup');
             const mainUI = document.getElementById('mainUI');
+
             function showMainUI() {
                 popup.style.display = 'none';
                 mainUI.style.display = 'block';
@@ -496,7 +347,6 @@
             }
             setTimeout(startFadeOut, 3000);
 
-            // ---- 画板核心 ----
             let canvas, ctx;
             let drawing = false;
             let currentTool = 'pen';
@@ -512,8 +362,7 @@
 
             const triggerBtn = document.getElementById('triggerBtn');
             const drawer = document.getElementById('drawer');
-            const cameraBtn = document.getElementById('cameraBtn');
-            const whiteboardBtn = document.getElementById('whiteboardBtn');
+            const modeToggleBtn = document.getElementById('modeToggleBtn');
             const menuBtn = document.getElementById('menuBtn');
             const menuPanel = document.getElementById('menuPanel');
             const penBtn = document.getElementById('penBtn');
@@ -529,10 +378,12 @@
             const thumbPanel = document.getElementById('thumbPanel');
             const pptTextLayer = document.getElementById('pptTextLayer');
             const cameraVideo = document.getElementById('cameraVideo');
+            const helpModal = document.getElementById('helpModal');
 
             let cameraStream = null;
             let cameraActive = false;
 
+            // ========== 展台功能（一键切换） ==========
             function startCamera() {
                 if (cameraStream) stopCamera();
                 navigator.mediaDevices.getUserMedia({ video: true })
@@ -540,11 +391,24 @@
                         cameraStream = stream;
                         cameraVideo.srcObject = stream;
                         cameraVideo.classList.add('active');
+                        cameraActive = true;
+                        // 画布变为透明，露出摄像头
                         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                         ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        // 把之前的黑色背景去掉，只保留笔迹（用 destination-out 思路重绘）
+                        // 简单做法：清空后重绘笔迹（但笔迹是画在黑色上的，无法区分）
+                        // 这里我们直接清空画布，把当前页的笔迹用“透明背景”重新画一遍是不现实的。
+                        // 因此我们采用：保留 imageData 但把黑色背景改为透明。
+                        const data = imageData.data;
+                        for (let i = 0; i < data.length; i += 4) {
+                            // 如果是纯黑（背景），设为透明
+                            if (data[i] === 0x0f && data[i+1] === 0x0f && data[i+2] === 0x0f && data[i+3] === 255) {
+                                data[i+3] = 0;
+                            }
+                        }
                         ctx.putImageData(imageData, 0, 0);
-                        cameraActive = true;
                         saveCurrentPageState();
+                        updateModeBtn();
                     })
                     .catch(err => alert('无法打开摄像头：' + err.message));
             }
@@ -557,47 +421,46 @@
                 cameraVideo.classList.remove('active');
                 cameraVideo.srcObject = null;
                 cameraActive = false;
+                // 把透明像素恢复成黑色背景
                 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                 const data = imageData.data;
                 for (let i = 0; i < data.length; i += 4) {
                     if (data[i+3] === 0) {
-                        data[i] = 0; data[i+1] = 0; data[i+2] = 0; data[i+3] = 255;
+                        data[i] = 0x0f; data[i+1] = 0x0f; data[i+2] = 0x0f; data[i+3] = 255;
                     }
                 }
                 ctx.putImageData(imageData, 0, 0);
                 saveCurrentPageState();
+                updateModeBtn();
             }
 
-            function switchToWhiteboard() {
-                if (cameraActive) stopCamera();
-                for (let [page, imgData] of pagesState.entries()) {
-                    const data = imgData.data;
-                    let modified = false;
-                    for (let i = 0; i < data.length; i += 4) {
-                        if (data[i+3] === 0) {
-                            data[i] = 0; data[i+1] = 0; data[i+2] = 0; data[i+3] = 255;
-                            modified = true;
-                        }
-                    }
-                    if (modified) pagesState.set(page, imgData);
+            function updateModeBtn() {
+                if (cameraActive) {
+                    modeToggleBtn.innerHTML = '✏️ 换回白板';
+                } else {
+                    modeToggleBtn.innerHTML = '📷 展台';
                 }
-                restorePageState(currentPage);
             }
 
+            // ========== 绘图核心 ==========
             function draw(e) {
                 if (!drawing) return;
                 const pos = getCanvasCoords(e);
                 if (currentTool === 'pen') {
+                    ctx.globalCompositeOperation = 'source-over';
                     ctx.strokeStyle = penColor;
                     ctx.lineWidth = penSize;
                 } else {
-                    ctx.strokeStyle = cameraActive ? 'rgba(0,0,0,0)' : '#0f0f0f';
+                    // 真·橡皮擦：擦成透明
+                    ctx.globalCompositeOperation = 'destination-out';
+                    ctx.strokeStyle = 'rgba(0,0,0,1)';
                     ctx.lineWidth = eraserSize;
                 }
                 ctx.lineTo(pos.x, pos.y);
                 ctx.stroke();
                 ctx.beginPath();
                 ctx.moveTo(pos.x, pos.y);
+                ctx.globalCompositeOperation = 'source-over';
             }
 
             function getCanvasCoords(e) {
@@ -703,12 +566,8 @@
                 resizeCanvas();
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
-                if (!cameraActive) {
-                    ctx.fillStyle = '#0f0f0f';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                } else {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                }
+                ctx.fillStyle = '#0f0f0f';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
                 saveCurrentPageState();
 
                 canvas.addEventListener('mousedown', startDraw);
@@ -749,14 +608,15 @@
                     if (oldImageData) {
                         ctx.putImageData(oldImageData, 0, 0);
                     } else {
-                        if (cameraActive) ctx.clearRect(0,0,canvas.width,canvas.height);
-                        else { ctx.fillStyle = '#0f0f0f'; ctx.fillRect(0,0,canvas.width,canvas.height); }
+                        ctx.fillStyle = '#0f0f0f';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
                     }
                 }
                 undoStack = [];
                 saveCurrentPageState();
             }
 
+            // ========== PPTX 解析 ==========
             async function parsePPTX(file) {
                 try {
                     const zip = await JSZip.loadAsync(file);
@@ -776,9 +636,7 @@
                         const xmlDoc = parser.parseFromString(xmlStr, 'application/xml');
                         const textNodes = xmlDoc.querySelectorAll('a\\:t, p\\:t, t');
                         let text = '';
-                        for (let node of textNodes) {
-                            text += node.textContent + ' ';
-                        }
+                        for (let node of textNodes) text += node.textContent + ' ';
                         slidesText.push(text.trim() || '（无文字）');
                     }
                     return { slidesText, total: slidesText.length };
@@ -812,6 +670,7 @@
                 alert(`成功导入PPTX，共 ${totalPages} 页（仅文本）`);
             }
 
+            // ========== 保存 ==========
             function saveSinglePage() {
                 saveCurrentPageState();
                 const dataURL = canvas.toDataURL('image/png');
@@ -860,7 +719,42 @@
                 menuPanel.classList.remove('show');
             }
 
+            // ========== 帮助弹窗 ==========
+            function copyEmail() {
+                const email = 'Ineedyourhelpofweb@163.com';
+                navigator.clipboard.writeText(email).then(() => {
+                    const box = document.getElementById('emailBox');
+                    box.classList.add('copied');
+                    box.innerHTML = '✅ 已复制到剪贴板！';
+                    setTimeout(() => {
+                        box.classList.remove('copied');
+                        box.innerHTML = '📧 Ineedyourhelpofweb@163.com';
+                    }, 2000);
+                }).catch(() => {
+                    // 降级方案
+                    const ta = document.createElement('textarea');
+                    ta.value = email;
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    const box = document.getElementById('emailBox');
+                    box.classList.add('copied');
+                    box.innerHTML = '✅ 已复制到剪贴板！';
+                    setTimeout(() => {
+                        box.classList.remove('copied');
+                        box.innerHTML = '📧 Ineedyourhelpofweb@163.com';
+                    }, 2000);
+                });
+            }
+
+            function closeHelp() {
+                helpModal.classList.remove('show');
+            }
+
+            // ========== 绑定事件 ==========
             function bindUIEvents() {
+                // 抽屉展开/收起
                 triggerBtn.onclick = (e) => {
                     e.stopPropagation();
                     drawer.classList.toggle('open');
@@ -875,9 +769,16 @@
                     }
                 });
 
-                cameraBtn.onclick = () => startCamera();
-                whiteboardBtn.onclick = () => switchToWhiteboard();
+                // 一键切换展台 / 白板
+                modeToggleBtn.onclick = () => {
+                    if (cameraActive) {
+                        stopCamera();
+                    } else {
+                        startCamera();
+                    }
+                };
 
+                // 菜单
                 menuBtn.onclick = (e) => {
                     e.stopPropagation();
                     closeAllPopups();
@@ -898,11 +799,12 @@
                                 input.click();
                                 break;
                             }
-                            case 'layout': alert('布局切换未开发'); break;
-                            case 'about': alert('HL5白班 授课助手 v5.2.3.822\n支持PPTX文本导入、摄像头展台'); break;
-                            case 'help': alert('帮助：笔/橡皮双击调设置，菜单保存，PPTX导入文本，展台模式可批注'); break;
-                            case 'back': alert('返回备课（演示）'); break;
-                            case 'close': alert('关闭（请手动关闭标签页）'); break;
+                            case 'help':
+                                helpModal.classList.add('show');
+                                break;
+                            case 'about':
+                                alert('HL5白班 授课助手 v5.2.3.822\n支持PPTX文本导入、摄像头展台');
+                                break;
                         }
                         menuPanel.classList.remove('show');
                     };
@@ -911,6 +813,7 @@
                     if (!menuPanel.contains(e.target) && e.target !== menuBtn) menuPanel.classList.remove('show');
                 });
 
+                // 工具
                 penBtn.onclick = () => { currentTool='pen'; penBtn.classList.add('active'); eraserBtn.classList.remove('active'); closeAllPopups(); };
                 penBtn.ondblclick = (e) => { e.stopPropagation(); penPopup.classList.toggle('show'); eraserPopup.classList.remove('show'); };
                 eraserBtn.onclick = () => { currentTool='eraser'; eraserBtn.classList.add('active'); penBtn.classList.remove('active'); closeAllPopups(); };
@@ -945,8 +848,18 @@
                 document.addEventListener('click', (e) => {
                     if(!thumbPanel.contains(e.target) && e.target !== pageInd) thumbPanel.classList.remove('show');
                 });
+
+                // 点击帮助弹窗外部关闭
+                helpModal.addEventListener('click', (e) => {
+                    if (e.target === helpModal) closeHelp();
+                });
+
                 window.addEventListener('resize', resizeCanvas);
             }
+
+            // 暴露给全局（供 onclick 调用）
+            window.copyEmail = copyEmail;
+            window.closeHelp = closeHelp;
         })();
     </script>
 </body>
