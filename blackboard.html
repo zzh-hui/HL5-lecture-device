@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>HL5白班 · 白板 v7.0.0</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; user-select:none; -webkit-tap-highlight-color:transparent; }
+        html, body {
+            width:100%; height:100%; overflow:hidden; background:#0f0f0f;
+            font-family:'Segoe UI', Roboto, system-ui, 'Helvetica Neue', sans-serif;
+            overscroll-behavior: none;
+            -webkit-overflow-scrolling: none;
+        }
+
+        /* 终端日志开场 */
+        #terminalBoot {
+            position:absolute; top:0; left:0; width:100%; height:100%;
+            background:#0a0a0a; z-index:2000;
+            padding:24px 28px;
+            font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace;
+            font-size:14px; line-height:1.7; color:#c8c8c8;
+            overflow:hidden;
+            transition: opacity 0.8s ease-out;
+        }
+        #terminalBoot.fade-out { opacity:0; }
+        .term-line { white-space:pre-wrap; word-break:break-word; }
+        .term-time { color:#555; margin-right:8px; }
+        .term-tag-info { color:#4a9eff; }
+        .term-tag-ok { color:#1FAA59; }
+        .term-tag-warn { color:#ffb347; }
+        .term-tag-head { color:#ffe66d; font-weight:600; }
+        .term-tag-dim { color:#666; }
+        .term-cursor {
+            display:inline-block; width:8px; height:15px;
+            background:#1FAA59; vertical-align:middle;
+            animation: blink 1s step-end infinite;
+            margin-left:2px;
+        }
+        @keyframes blink {
+            0%, 100% { opacity:1; }
+            50% { opacity:0; }
+        }
+        .term-scroll { max-height:100%; overflow:hidden; }
+
+        #mainUI { position:relative; width:100%; height:100%; display:none; background:transparent; color:white; }
+        #boardCanvas {
+            position:absolute; top:0; left:0; width:100%; height:100%;
+            display:block;
+            touch-action: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            cursor:crosshair;
+            z-index:1;
+            overscroll-behavior: none;
+        }
+
+        .bottom-left { position:absolute; bottom:20px; left:20px; z-index:25; display:flex; gap:10px; }
+        .menu-btn, .stage-btn {
+            background:#2b2b2b; border:2px solid #4a4a4a; color:white;
+            font-size:1.15rem; padding:12px 20px; border-radius:40px;
+            cursor:pointer; display:flex; gap:8px; align-items:center;
+            box-shadow:0 4px 12px rgba(0,0,0,0.5);
+            transition:0.2s;
+            white-space:nowrap;
+        }
+        .menu-btn:active, .stage-btn:active { background:#3f3f3f; }
+        .stage-btn { border-color:#1FAA59; color:#1FAA59; }
+        .stage-btn:active { background:#1FAA59; color:white; }
+
+        .menu-panel {
+            position:absolute; bottom:80px; left:0; background:#2d2d2d;
+            border:1px solid #555; border-radius:24px; padding:16px 0;
+            min-width:220px; display:none; flex-direction:column; z-index:35;
+        }
+        .menu-panel.show { display:flex; }
+        .menu-item {
+            padding:14px 24px; color:#eee; font-size:1.05rem;
+            cursor:pointer; border-bottom:1px solid #3f3f3f;
+        }
+        .menu-item:last-child { border-bottom:none; }
+        .menu-item:active { background:#3f3f3f; }
+
+        .bottom-center {
+            position:absolute; bottom:30px; left:50%; transform:translateX(-50%);
+            display:flex; gap:12px; background:rgba(30,30,30,0.8);
+            backdrop-filter:blur(8px); padding:10px 20px; border-radius:60px;
+            border:1px solid #444; z-index:25; align-items:center;
+        }
+        .tool-btn {
+            background:transparent; border:none; color:#ddd; font-size:1.4rem;
+            padding:8px 16px; border-radius:40px; cursor:pointer;
+            display:flex; flex-direction:column; align-items:center; min-width:70px;
+        }
+        .tool-btn span { font-size:0.75rem; margin-top:4px; }
+        .tool-btn.active { background:#1FAA59; color:white; }
+        .tool-btn svg { width:22px; height:22px; fill:currentColor; }
+
+        .tool-popup {
+            position:absolute; bottom:110px; left:50%; transform:translateX(-50%);
+            background:#2d2d2d; padding:18px 22px; border-radius:30px;
+            border:1px solid #555; display:none; gap:22px; z-index:40;
+        }
+        .tool-popup.show { display:flex; }
+        .color-palette { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+        .color-option {
+            width:38px; height:38px; border-radius:50%; border:2px solid white; cursor:pointer;
+        }
+        .slider-container {
+            display:flex; flex-direction:column; align-items:center; gap:8px;
+            color:white; min-width:150px;
+        }
+        input { width:100%; }
+
+        .bottom-right-wrap {
+            position:absolute; bottom:20px; right:20px;
+            display:flex; flex-direction:column; align-items:flex-end;
+            gap:10px; z-index:25;
+        }
+        .zoom-controls {
+            display:flex; gap:6px;
+            background:rgba(30,30,30,0.7); backdrop-filter:blur(6px);
+            padding:6px 10px; border-radius:40px; border:1px solid #3a3a3a;
+        }
+        .zoom-btn {
+            width:34px; height:34px; border-radius:50%;
+            background:#2a2a2a; border:none; color:white;
+            font-size:1.2rem; cursor:pointer; display:flex; align-items:center;
+            justify-content:center; transition:0.2s;
+        }
+        .zoom-btn:active { background:#3f3f3f; }
+        .bottom-right {
+            display:flex; gap:10px; background:rgba(30,30,30,0.7);
+            backdrop-filter:blur(6px); padding:8px 18px; border-radius:50px;
+            border:1px solid #3a3a3a;
+        }
+        .page-btn {
+            background:#2a2a2a; border:none; color:white; font-size:1.2rem;
+            padding:8px 16px; border-radius:40px; cursor:pointer; min-width:70px;
+        }
+        .page-btn:disabled { opacity:0.3; pointer-events:none; }
+        .page-indicator {
+            background:#1e1e1e; padding:8px 18px; border-radius:40px;
+            font-size:1.2rem; border:1px solid #4a4a4a; cursor:pointer;
+        }
+        .thumbnails-panel {
+            position:absolute; bottom:120px; right:20px; background:#252525;
+            border-radius:24px; padding:20px; display:none;
+            grid-template-columns:repeat(3,1fr); gap:12px; z-index:45;
+        }
+        .thumbnails-panel.show { display:grid; }
+        .thumb-item {
+            background:#3a3a3a; aspect-ratio:4/3; border-radius:12px;
+            display:flex; align-items:center; justify-content:center;
+            font-size:1.2rem; color:#aaa; border:2px solid transparent; cursor:pointer;
+        }
+        .thumb-item.active { border-color:#1FAA59; color:white; }
+
+        .help-modal {
+            position:fixed; top:0; left:0; width:100%; height:100%;
+            background:rgba(0,0,0,0.7); display:none;
+            align-items:center; justify-content:center; z-index:1000;
+        }
+        .help-modal.show { display:flex; }
+        .help-content {
+            background:#2d2d2d; border:1px solid #555; border-radius:24px;
+            padding:32px 28px; max-width:480px; width:88%;
+            box-shadow:0 20px 60px rgba(0,0,0,0.8);
+            text-align:center; color:white;
+        }
+        .help-content h2 { font-size:1.6rem; margin-bottom:8px; color:#1FAA59; }
+        .help-content .subtitle { font-size:0.95rem; color:#aaa; margin-bottom:20px; }
+        .help-content .email-box {
+            background:#1e1e1e; border:2px solid #1FAA59; border-radius:14px;
+            padding:16px; margin:16px 0; cursor:pointer;
+            transition:all 0.2s; display:flex; align-items:center; justify-content:center;
+            gap:10px; font-size:1.15rem; font-weight:600;
+            color:#1FAA59; word-break:break-all;
+        }
+        .help-content .email-box:active { background:#2a2a2a; transform:scale(0.98); }
+        .help-content .email-box.copied { background:#1FAA59; color:white; border-color:#1FAA59; }
+        .help-content .email-hint { font-size:0.85rem; color:#888; margin-top:8px; }
+        .help-content .close-btn {
+            margin-top:20px; padding:10px 32px; border-radius:40px;
+            border:1px solid #555; background:transparent; color:#ccc;
+            font-size:1rem; cursor:pointer; transition:0.2s;
+        }
+        .help-content .close-btn:active { background:#3f3f3f; }
+
+        .toast {
+            position:absolute;
+            top:20px; left:50%; transform:translateX(-50%) translateY(-100px);
+            background:rgba(31,170,89,0.95);
+            color:white;
+            padding:12px 26px;
+            border-radius:40px;
+            font-size:1rem;
+            font-weight:600;
+            z-index:3000;
+            transition:transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+            box-shadow:0 6px 20px rgba(0,0,0,0.4);
+            white-space:nowrap;
+        }
+        .toast.show { transform:translateX(-50%) translateY(0); }
+
+        @media (max-width:600px) {
+            #terminalBoot { font-size:11px; padding:16px 18px; line-height:1.6; }
+            .bottom-center { gap:6px; padding:8px 14px; }
+            .tool-btn { font-size:1.1rem; min-width:52px; padding:6px 8px; }
+            .tool-btn svg { width:18px; height:18px; }
+            .page-btn { padding:6px 10px; font-size:0.95rem; min-width:44px; }
+            .menu-btn, .stage-btn { padding:8px 14px; font-size:0.95rem; }
+            .help-content { padding:24px 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="terminalBoot">
+        <div class="term-scroll" id="termScroll"></div>
+    </div>
+
+    <div id="mainUI">
+        <canvas id="boardCanvas"></canvas>
+
+        <div class="bottom-left">
+            <div class="menu-btn" id="menuBtn">☰ 菜单</div>
+            <div class="stage-btn" id="stageBtn">📷 切换到展台</div>
+            <div class="menu-panel" id="menuPanel">
+                <div class="menu-item" data-action="saveSingle">📷 保存单页为图片</div>
+                <div class="menu-item" data-action="saveAll">📦 保存所有页为ZIP</div>
+                <div class="menu-item" data-action="open">📂 打开PPTX文件</div>
+                <div class="menu-item" data-action="help">🆘 帮助 / 建议</div>
+                <div class="menu-item" data-action="about">关于</div>
+                <div class="menu-item version">7.0.0</div>
+            </div>
+        </div>
+
+        <div class="bottom-center">
+            <button class="tool-btn" id="selectBtn" title="选择/拖拽/缩放">
+                <svg viewBox="0 0 24 24"><path d="M4 2l16 8-6 2-2 6-8-16z"/></svg>
+                <span>选择</span>
+            </button>
+            <button class="tool-btn" id="penBtn">✏️<span>笔</span></button>
+            <button class="tool-btn" id="eraserBtn">🧽<span>橡皮</span></button>
+            <button class="tool-btn" id="undoBtn">↩️<span>撤销</span></button>
+        </div>
+
+        <div class="tool-popup" id="penPopup">
+            <div class="color-palette">
+                <div class="color-option" style="background:#ffffff;" data-color="#ffffff"></div>
+                <div class="color-option" style="background:#ffff00;" data-color="#ffff00"></div>
+                <div class="color-option" style="background:#ff4444;" data-color="#ff4444"></div>
+                <div class="color-option" style="background:#4caf50;" data-color="#4caf50"></div>
+                <div class="color-option" style="background:#00bcd4;" data-color="#00bcd4"></div>
+                <div class="color-option" style="background:#ff9800;" data-color="#ff9800"></div>
+                <div class="color-option" style="background:#9c27b0;" data-color="#9c27b0"></div>
+                <div class="color-option" style="background:#795548;" data-color="#795548"></div>
+            </div>
+            <div class="slider-container">
+                <label>粗细</label>
+                <input type="range" id="penSize" min="2" max="30" value="5">
+            </div>
+        </div>
+        <div class="tool-popup" id="eraserPopup">
+            <div class="slider-container">
+                <label>滑动清除笔迹</label>
+                <input type="range" id="eraserSize" min="5" max="100" value="20">
+            </div>
+        </div>
+
+        <div class="bottom-right-wrap">
+            <div class="zoom-controls">
+                <button class="zoom-btn" id="zoomOutBtn">−</button>
+                <button class="zoom-btn" id="zoomResetBtn">⊙</button>
+                <button class="zoom-btn" id="zoomInBtn">+</button>
+            </div>
+            <div class="bottom-right">
+                <button class="page-btn" id="prevPage">◀ 上一页</button>
+                <span class="page-indicator" id="pageIndicator">1/1</span>
+                <button class="page-btn" id="nextPage">下一页 ▶</button>
+            </div>
+        </div>
+        <div class="thumbnails-panel" id="thumbPanel"></div>
+    </div>
+
+    <div class="help-modal" id="helpModal">
+        <div class="help-content">
+            <h2>🆘 帮助 / 建议</h2>
+            <div class="subtitle">HL5白班 · 一人 + AI 打造的小工具</div>
+            <p style="color:#ccc; font-size:0.95rem; line-height:1.6;">
+                如果你在使用中遇到问题，<br>或有更好的建议，欢迎邮件联系我。
+            </p>
+            <p style="color:#ff8c42; font-size:0.85rem; margin-top:12px;">
+                ⚠️ 邮件标题请写「帮助」或「建议」等词语<br>否则我可能不会点开看哦～
+            </p>
+            <div class="email-box" id="emailBox" onclick="copyEmail()">
+                📧 Ineedyourhelpofweb@163.com
+            </div>
+            <div class="email-hint">👆 点击上方邮箱即可一键复制</div>
+            <button class="close-btn" onclick="closeHelp()">关闭</button>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+<script>
+(function(){
+    'use strict';
+
+    /* ============================================================
+       终端日志开场
+    ============================================================ */
+    const termScroll = document.getElementById('termScroll');
+    const terminalBoot = document.getElementById('terminalBoot');
+    const mainUI = document.getElementById('mainUI');
+
+    const bootLogs = [
+        { t:'info', tag:'[BOOT]', msg:'HL5 白板系统 初始化中...' },
+        { t:'dim',  tag:'[SYS] ', msg:'检测运行环境...' },
+        { t:'info', tag:'[SYS] ', msg:'浏览器内核: ' + navigator.userAgent.slice(0, 40) + '...' },
+        { t:'ok',   tag:'[OK]  ', msg:'Canvas 2D 渲染器就绪' },
+        { t:'ok',   tag:'[OK]  ', msg:'触摸/指针事件已绑定' },
+        { t:'dim',  tag:'[SYS] ', msg:'加载多指书写模块...' },
+        { t:'ok',   tag:'[OK]  ', msg:'多指同时书写已启用' },
+        { t:'dim',  tag:'[SYS] ', msg:'加载缩放平移模块...' },
+        { t:'ok',   tag:'[OK]  ', msg:'双指手势 + 鼠标滚轮已启用' },
+        { t:'dim',  tag:'[SYS] ', msg:'加载展台联动模块...' },
+        { t:'ok',   tag:'[OK]  ', msg:'BroadcastChannel 已连接' },
+        { t:'dim',  tag:'[SYS] ', msg:'加载图片对象模块...' },
+        { t:'ok',   tag:'[OK]  ', msg:'图片拖动/四角缩放已启用' },
+        { t:'warn', tag:'[WARN]', msg:'PPTX 仅支持文本提取' },
+        { t:'info', tag:'[VER] ', msg:'版本号: 7.0.0' },
+        { t:'info', tag:'[AUTH]', msg:'作者: HL5 白班 · 一人 + AI' },
+        { t:'ok',   tag:'[OK]  ', msg:'全部模块加载完成' },
+        { t:'head', tag:'[RUN] ', msg:'启动白板界面...' }
+    ];
+
+    let logIndex = 0;
+    function printNextLog() {
+        if (logIndex >= bootLogs.length) {
+            setTimeout(() => {
+                terminalBoot.classList.add('fade-out');
+                setTimeout(() => {
+                    terminalBoot.style.display = 'none';
+                    mainUI.style.display = 'block';
+                    initCanvas();
+                    bindUIEvents();
+                }, 800);
+            }, 800);
+            return;
+        }
+        const log = bootLogs[logIndex];
+        const now = new Date();
+        const time = String(now.getHours()).padStart(2,'0') + ':' +
+                     String(now.getMinutes()).padStart(2,'0') + ':' +
+                     String(now.getSeconds()).padStart(2,'0');
+        const line = document.createElement('div');
+        line.className = 'term-line';
+        let tagClass = 'term-tag-info';
+        if (log.t === 'ok') tagClass = 'term-tag-ok';
+        else if (log.t === 'warn') tagClass = 'term-tag-warn';
+        else if (log.t === 'head') tagClass = 'term-tag-head';
+        else if (log.t === 'dim') tagClass = 'term-tag-dim';
+        line.innerHTML = `<span class="term-time">${time}</span><span class="${tagClass}">${log.tag}</span> ${log.msg}`;
+        termScroll.appendChild(line);
+        termScroll.scrollTop = termScroll.scrollHeight;
+
+        const oldCursor = termScroll.querySelector('.term-cursor');
+        if (oldCursor) oldCursor.remove();
+        const cursorLine = document.createElement('div');
+        cursorLine.className = 'term-line';
+        cursorLine.innerHTML = `<span class="term-cursor"></span>`;
+        termScroll.appendChild(cursorLine);
+        termScroll.scrollTop = termScroll.scrollHeight;
+
+        logIndex++;
+        setTimeout(printNextLog, 150 + Math.random() * 200);
+    }
+    setTimeout(printNextLog, 400);
+
+
+    /* ============================================================
+       全局状态
+    ============================================================ */
+    let canvas, ctx;
+    let inkCanvas, inkCtx;
+    const view = { scale: 1, offsetX: 0, offsetY: 0 };
+    const MIN_SCALE = 0.3, MAX_SCALE = 5;
+
+    const pagesInk = new Map();
+    const pageImages = new Map();
+    const pageText = new Map();
+    let currentPage = 1, totalPages = 1;
+    let isPPTMode = false;
+
+    let currentTool = 'pen';
+    let penColor = '#ffffff';
+    let penSize = 5;
+    let eraserSize = 20;
+    let undoStack = [];
+
+    let selectMode = false;
+    let isPanning = false;
+    let panStart = null;
+    let pinchStart = null;
+
+    let selectedImageId = null;
+    let dragImageInfo = null;
+    let resizeImageInfo = null;
+
+    const touchPoints = new Map();
+    let mouseDown = false, mousePointer = null;
+
+    /* ============================================================
+       频道通信
+    ============================================================ */
+    const CHANNEL_NAME = 'hl5-whiteboard';
+    let channel = null;
+    try { channel = new BroadcastChannel(CHANNEL_NAME); } catch (e) {}
+
+    function getCurrentPageImages() {
+        if (!pageImages.has(currentPage)) pageImages.set(currentPage, []);
+        return pageImages.get(currentPage);
+    }
+
+    function handleStageImage(dataUrl) {
+        const img = new Image();
+        img.onload = () => {
+            const maxW = canvas.width * 0.6;
+            const maxH = canvas.height * 0.6;
+            let w = img.width, h = img.height;
+            const ratio = Math.min(maxW / w, maxH / h, 1);
+            w *= ratio; h *= ratio;
+            const x = (canvas.width - w) / 2;
+            const y = (canvas.height - h) / 2;
+            getCurrentPageImages().push({
+                id: 'img_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+                img: img, x, y, w, h
+            });
+            refreshDisplay();
+            showToast('📷 收到展台图片，可在「选择」模式下拖动缩放');
+        };
+        img.onerror = () => showToast('图片加载失败');
+        img.src = dataUrl;
+    }
+
+    if (channel) {
+        channel.addEventListener('message', (e) => {
+            const msg = e.data || {};
+            if (msg.type === 'stage-image' && msg.data) handleStageImage(msg.data);
+            else if (msg.type === 'focus-whiteboard') window.focus();
+        });
+    } else {
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'hl5_stage_image' && e.newValue) {
+                try {
+                    const obj = JSON.parse(e.newValue);
+                    if (obj && obj.data) handleStageImage(obj.data);
+                } catch (err) {}
+            }
+        });
+    }
+
+
+    /* ============================================================
+       视图变换
+    ============================================================ */
+    function applyView() {
+        ctx.setTransform(view.scale, 0, 0, view.scale, view.offsetX, view.offsetY);
+    }
+
+    function getWorldFromEvent(clientX, clientY) {
+        const rect = canvas.getBoundingClientRect();
+        const sx = (clientX - rect.left) / view.scale - view.offsetX / view.scale;
+        const sy = (clientY - rect.top) / view.scale - view.offsetY / view.scale;
+        return { x: sx, y: sy };
+    }
+
+    function zoomAt(clientX, clientY, factor) {
+        const rect = canvas.getBoundingClientRect();
+        const sx = clientX - rect.left;
+        const sy = clientY - rect.top;
+        const world = getWorldFromEvent(clientX, clientY);
+        let newScale = view.scale * factor;
+        newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, newScale));
+        view.scale = newScale;
+        view.offsetX = sx - world.x * newScale;
+        view.offsetY = sy - world.y * newScale;
+        applyView();
+        refreshDisplay();
+    }
+
+
+    /* ============================================================
+       笔迹层管理
+    ============================================================ */
+    function ensureInkCanvas() {
+        if (inkCanvas && inkCanvas.width === canvas.width && inkCanvas.height === canvas.height) return;
+        inkCanvas = document.createElement('canvas');
+        inkCanvas.width = canvas.width;
+        inkCanvas.height = canvas.height;
+        inkCtx = inkCanvas.getContext('2d', { alpha: true });
+        inkCtx.lineCap = 'round';
+        inkCtx.lineJoin = 'round';
+    }
+
+    function saveInkToMap() {
+        if (!inkCanvas) return;
+        const imageData = inkCtx.getImageData(0, 0, inkCanvas.width, inkCanvas.height);
+        pagesInk.set(currentPage, imageData);
+    }
+
+    function restoreInkFromMap(page) {
+        ensureInkCanvas();
+        inkCtx.save();
+        inkCtx.setTransform(1, 0, 0, 1, 0, 0);
+        inkCtx.clearRect(0, 0, inkCanvas.width, inkCanvas.height);
+        inkCtx.restore();
+        const data = pagesInk.get(page);
+        if (data) {
+            try { inkCtx.putImageData(data, 0, 0); } catch(e) {}
+        }
+    }
+
+
+    /* ============================================================
+       重绘（图层：黑底 → 图片 → 文字 → 笔迹）
+    ============================================================ */
+    function refreshDisplay() {
+        if (!ctx || !inkCanvas) return;
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. 黑底
+        ctx.fillStyle = '#0f0f0f';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 2. 图片
+        getCurrentPageImages().forEach(imgObj => {
+            ctx.drawImage(imgObj.img, imgObj.x, imgObj.y, imgObj.w, imgObj.h);
+        });
+
+        // 3. PPT 文字
+        if (isPPTMode && pageText.has(currentPage)) {
+            const text = pageText.get(currentPage);
+            if (text) {
+                ctx.save();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '32px "Segoe UI", Roboto, sans-serif';
+                ctx.textBaseline = 'top';
+                ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                ctx.shadowBlur = 6;
+                wrapText(ctx, text, 60, 80, canvas.width - 120, 44);
+                ctx.restore();
+            }
+        }
+
+        // 4. 笔迹
+        ctx.drawImage(inkCanvas, 0, 0);
+
+        ctx.restore();
+        applyView();
+
+        // 5. 选中图片的角点（屏幕坐标绘制）
+        if (selectMode && selectedImageId) {
+            const sel = getCurrentPageImages().find(im => im.id === selectedImageId);
+            if (sel) {
+                ctx.save();
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                const corners = [
+                    { x: sel.x, y: sel.y },
+                    { x: sel.x + sel.w, y: sel.y },
+                    { x: sel.x + sel.w, y: sel.y + sel.h },
+                    { x: sel.x, y: sel.y + sel.h }
+                ].map(c => ({
+                    x: c.x * view.scale + view.offsetX,
+                    y: c.y * view.scale + view.offsetY
+                }));
+                ctx.strokeStyle = '#1FAA59';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(corners[0].x, corners[0].y);
+                for (let i = 1; i < 4; i++) ctx.lineTo(corners[i].x, corners[i].y);
+                ctx.closePath();
+                ctx.stroke();
+                corners.forEach(c => {
+                    ctx.fillStyle = '#1FAA59';
+                    ctx.beginPath();
+                    ctx.arc(c.x, c.y, 8, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                });
+                ctx.restore();
+            }
+        }
+    }
+
+    function wrapText(context, text, x, y, maxWidth, lineHeight) {
+        const paragraphs = text.split('\n');
+        let yy = y;
+        for (let p of paragraphs) {
+            let line = '';
+            for (let i = 0; i < p.length; i++) {
+                const testLine = line + p[i];
+                if (context.measureText(testLine).width > maxWidth && line !== '') {
+                    context.fillText(line, x, yy);
+                    line = p[i];
+                    yy += lineHeight;
+                } else {
+                    line = testLine;
+                }
+            }
+            context.fillText(line, x, yy);
+            yy += lineHeight;
+        }
+    }
+
+
+    /* ============================================================
+       绘画
+    ============================================================ */
+    function beginStroke(p) {
+        p.started = true;
+        p.lastX = p.x;
+        p.lastY = p.y;
+        inkCtx.save();
+        if (p.tool === 'eraser') {
+            inkCtx.globalCompositeOperation = 'destination-out';
+            inkCtx.strokeStyle = 'rgba(0,0,0,1)';
+            inkCtx.lineWidth = p.width;
+        } else {
+            inkCtx.globalCompositeOperation = 'source-over';
+            inkCtx.strokeStyle = p.color;
+            inkCtx.lineWidth = p.width;
+        }
+        inkCtx.beginPath();
+        inkCtx.moveTo(p.x, p.y);
+    }
+
+    function continueStroke(p) {
+        if (!p.started) return;
+        inkCtx.beginPath();
+        inkCtx.moveTo(p.lastX, p.lastY);
+        inkCtx.lineTo(p.x, p.y);
+        inkCtx.stroke();
+        p.lastX = p.x;
+        p.lastY = p.y;
+    }
+
+    function endStroke(p) {
+        if (p.started) {
+            inkCtx.restore();
+            p.started = false;
+        }
+    }
+
+
+    /* ============================================================
+       撤销
+    ============================================================ */
+    function saveUndoState() {
+        const imageData = inkCtx.getImageData(0, 0, inkCanvas.width, inkCanvas.height);
+        undoStack.push({
+            page: currentPage,
+            imageData: imageData,
+            images: getCurrentPageImages().map(im => ({ id:im.id, x:im.x, y:im.y, w:im.w, h:im.h }))
+        });
+        if (undoStack.length > 20) undoStack.shift();
+    }
+
+    function undo() {
+        if (undoStack.length === 0) return;
+        const state = undoStack.pop();
+        if (state.page !== currentPage) return;
+        inkCtx.save();
+        inkCtx.setTransform(1, 0, 0, 1, 0, 0);
+        inkCtx.clearRect(0, 0, inkCanvas.width, inkCanvas.height);
+        inkCtx.putImageData(state.imageData, 0, 0);
+        inkCtx.restore();
+        const imgs = getCurrentPageImages();
+        state.images.forEach(saved => {
+            const im = imgs.find(i => i.id === saved.id);
+            if (im) { im.x = saved.x; im.y = saved.y; im.w = saved.w; im.h = saved.h; }
+        });
+        refreshDisplay();
+        saveInkToMap();
+    }
+
+    function clearInk() {
+        saveUndoState();
+        inkCtx.save();
+        inkCtx.setTransform(1, 0, 0, 1, 0, 0);
+        inkCtx.clearRect(0, 0, inkCanvas.width, inkCanvas.height);
+        inkCtx.restore();
+        saveInkToMap();
+        refreshDisplay();
+    }
+
+
+    /* ============================================================
+       页面切换
+    ============================================================ */
+    function switchPage(newPage) {
+        if (newPage < 1 || newPage > totalPages) return;
+        saveInkToMap();
+        currentPage = newPage;
+        restoreInkFromMap(currentPage);
+        refreshDisplay();
+        updatePageUI();
+        closeAllPopups();
+    }
+
+    function updatePageUI() {
+        pageInd.innerText = `${currentPage}/${totalPages}`;
+        if (!isPPTMode) {
+            nextBtn.innerText = (currentPage >= totalPages) ? '+1页' : '下一页 ▶';
+            nextBtn.disabled = false;
+            prevBtn.disabled = (currentPage <= 1);
+        } else {
+            nextBtn.innerText = '下一页 ▶';
+            nextBtn.disabled = (currentPage >= totalPages);
+            prevBtn.disabled = (currentPage <= 1);
+        }
+    }
+
+    function addNewPage() {
+        if (isPPTMode) return;
+        totalPages++;
+        switchPage(totalPages);
+    }
+
+
+    /* ============================================================
+       DOM 引用
+    ============================================================ */
+    const menuBtn = document.getElementById('menuBtn');
+    const stageBtn = document.getElementById('stageBtn');
+    const menuPanel = document.getElementById('menuPanel');
+    const selectBtn = document.getElementById('selectBtn');
+    const penBtn = document.getElementById('penBtn');
+    const eraserBtn = document.getElementById('eraserBtn');
+    const undoBtn = document.getElementById('undoBtn');
+    const penPopup = document.getElementById('penPopup');
+    const eraserPopup = document.getElementById('eraserPopup');
+    const penSizeInput = document.getElementById('penSize');
+    const eraserSizeInput = document.getElementById('eraserSize');
+    const prevBtn = document.getElementById('prevPage');
+    const nextBtn = document.getElementById('nextPage');
+    const pageInd = document.getElementById('pageIndicator');
+    const thumbPanel = document.getElementById('thumbPanel');
+    const helpModal = document.getElementById('helpModal');
+    const zoomInBtn = document.getElementById('zoomInBtn');
+    const zoomOutBtn = document.getElementById('zoomOutBtn');
+    const zoomResetBtn = document.getElementById('zoomResetBtn');
+    const toast = document.getElementById('toast');
+
+    let toastTimer = null;
+    function showToast(msg, duration = 2000) {
+        toast.textContent = msg;
+        toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove('show'), duration);
+    }
+
+    function closeAllPopups() {
+        penPopup.classList.remove('show');
+        eraserPopup.classList.remove('show');
+        thumbPanel.classList.remove('show');
+        menuPanel.classList.remove('show');
+    }
+
+
+    /* ============================================================
+       命中检测
+    ============================================================ */
+    function hitTestImage(worldX, worldY) {
+        const images = getCurrentPageImages();
+        for (let i = images.length - 1; i >= 0; i--) {
+            const img = images[i];
+            if (worldX >= img.x && worldX <= img.x + img.w &&
+                worldY >= img.y && worldY <= img.y + img.h) {
+                return img;
+            }
+        }
+        return null;
+    }
+
+    function hitTestCorner(worldX, worldY, img) {
+        const handleSize = 18 / view.scale;
+        const corners = [
+            { name:'tl', x: img.x, y: img.y },
+            { name:'tr', x: img.x + img.w, y: img.y },
+            { name:'bl', x: img.x, y: img.y + img.h },
+            { name:'br', x: img.x + img.w, y: img.y + img.h }
+        ];
+        for (let c of corners) {
+            if (Math.abs(worldX - c.x) < handleSize && Math.abs(worldY - c.y) < handleSize) {
+                return c.name;
+            }
+        }
+        return null;
+    }
+
+
+    /* ============================================================
+       图片缩放（四角等比）
+    ============================================================ */
+    function computeResize(info, worldX, worldY) {
+        const dx = worldX - info.startX;
+        const dy = worldY - info.startY;
+        let newW = info.startW, newH = info.startH;
+        let newX = info.startX0, newY = info.startY0;
+        if (info.corner === 'br') { newW = info.startW + dx; newH = info.startH + dy; }
+        if (info.corner === 'tr') { newW = info.startW + dx; newH = info.startH - dy; newY = info.startY0 + dy; }
+        if (info.corner === 'bl') { newW = info.startW - dx; newH = info.startH + dy; newX = info.startX0 + dx; }
+        if (info.corner === 'tl') { newW = info.startW - dx; newH = info.startH - dy; newX = info.startX0 + dx; newY = info.startY0 + dy; }
+        const ratio = info.startW / info.startH;
+        if (newW / newH > ratio) newW = newH * ratio;
+        else newH = newW / ratio;
+        if (newW < 40 || newH < 40) return null;
+        return { newW, newH, newX, newY };
+    }
+
+
+    /* ============================================================
+       鼠标事件
+    ============================================================ */
+    function onMouseDown(e) {
+        if (selectMode) {
+            const world = getWorldFromEvent(e.clientX, e.clientY);
+            const images = getCurrentPageImages();
+            const selImg = images.find(im => im.id === selectedImageId);
+            if (selImg) {
+                const corner = hitTestCorner(world.x, world.y, selImg);
+                if (corner) {
+                    resizeImageInfo = {
+                        img: selImg, corner,
+                        startX: world.x, startY: world.y,
+                        startW: selImg.w, startH: selImg.h,
+                        startX0: selImg.x, startY0: selImg.y
+                    };
+                    saveUndoState();
+                    return;
+                }
+            }
+            const img = hitTestImage(world.x, world.y);
+            if (img) {
+                selectedImageId = img.id;
+                dragImageInfo = {
+                    img, startX: world.x, startY: world.y,
+                    startX0: img.x, startY0: img.y
+                };
+                saveUndoState();
+                refreshDisplay();
+                return;
+            }
+            selectedImageId = null;
+            isPanning = true;
+            panStart = { x:e.clientX, y:e.clientY, ox:view.offsetX, oy:view.offsetY };
+            refreshDisplay();
+            return;
+        }
+
+        const w = getWorldFromEvent(e.clientX, e.clientY);
+        mousePointer = {
+            x:w.x, y:w.y, lastX:w.x, lastY:w.y,
+            tool: currentTool,
+            color: penColor,
+            width: currentTool === 'pen' ? penSize : eraserSize,
+            started: false
+        };
+        mouseDown = true;
+        beginStroke(mousePointer);
+        saveUndoState();
+    }
+
+    function onMouseMove(e) {
+        if (isPanning) {
+            view.offsetX = panStart.ox + (e.clientX - panStart.x);
+            view.offsetY = panStart.oy + (e.clientY - panStart.y);
+            applyView();
+            refreshDisplay();
+            return;
+        }
+        if (dragImageInfo) {
+            const world = getWorldFromEvent(e.clientX, e.clientY);
+            dragImageInfo.img.x = dragImageInfo.startX0 + (world.x - dragImageInfo.startX);
+            dragImageInfo.img.y = dragImageInfo.startY0 + (world.y - dragImageInfo.startY);
+            refreshDisplay();
+            return;
+        }
+        if (resizeImageInfo) {
+            const world = getWorldFromEvent(e.clientX, e.clientY);
+            const res = computeResize(resizeImageInfo, world.x, world.y);
+            if (res) {
+                resizeImageInfo.img.w = res.newW;
+                resizeImageInfo.img.h = res.newH;
+                resizeImageInfo.img.x = res.newX;
+                resizeImageInfo.img.y = res.newY;
+                refreshDisplay();
+            }
+            return;
+        }
+        if (!mouseDown || !mousePointer) return;
+        const w = getWorldFromEvent(e.clientX, e.clientY);
+        mousePointer.x = w.x;
+        mousePointer.y = w.y;
+        continueStroke(mousePointer);
+        refreshDisplay();
+    }
+
+    function onMouseUp() {
+        if (isPanning) { isPanning = false; return; }
+        if (dragImageInfo) { dragImageInfo = null; return; }
+        if (resizeImageInfo) { resizeImageInfo = null; return; }
+        if (mouseDown && mousePointer) {
+            endStroke(mousePointer);
+            mouseDown = false;
+            mousePointer = null;
+            saveInkToMap();
+            refreshDisplay();
+        }
+    }
+
+
+    /* ============================================================
+       触摸事件
+    ============================================================ */
+    function startPinch(touches) {
+        const t1 = touches[0], t2 = touches[1];
+        const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        const midX = (t1.clientX + t2.clientX) / 2;
+        const midY = (t1.clientY + t2.clientY) / 2;
+        pinchStart = {
+            dist,
+            scale: view.scale,
+            midX, midY,
+            worldMid: getWorldFromEvent(midX, midY)
+        };
+    }
+
+    function onTouchStart(e) {
+        e.preventDefault();
+
+        if (selectMode) {
+            if (e.touches.length === 1) {
+                const t = e.touches[0];
+                const world = getWorldFromEvent(t.clientX, t.clientY);
+                const images = getCurrentPageImages();
+                const selImg = images.find(im => im.id === selectedImageId);
+                if (selImg) {
+                    const corner = hitTestCorner(world.x, world.y, selImg);
+                    if (corner) {
+                        resizeImageInfo = {
+                            img: selImg, corner,
+                            startX: world.x, startY: world.y,
+                            startW: selImg.w, startH: selImg.h,
+                            startX0: selImg.x, startY0: selImg.y
+                        };
+                        saveUndoState();
+                        return;
+                    }
+                }
+                const img = hitTestImage(world.x, world.y);
+                if (img) {
+                    selectedImageId = img.id;
+                    dragImageInfo = {
+                        img, startX: world.x, startY: world.y,
+                        startX0: img.x, startY0: img.y
+                    };
+                    saveUndoState();
+                    refreshDisplay();
+                    return;
+                }
+                selectedImageId = null;
+                isPanning = true;
+                panStart = { x:t.clientX, y:t.clientY, ox:view.offsetX, oy:view.offsetY };
+                refreshDisplay();
+                return;
+            }
+            if (e.touches.length >= 2) {
+                startPinch(e.touches);
+                return;
+            }
+            return;
+        }
+
+        // 画笔模式
+        if (e.touches.length >= 2) {
+            startPinch(e.touches);
+            return;
+        }
+
+        if (e.touches.length === 1) {
+            const t = e.touches[0];
+            const w = getWorldFromEvent(t.clientX, t.clientY);
+            const p = {
+                id: t.identifier,
+                x: w.x, y: w.y, lastX: w.x, lastY: w.y,
+                tool: currentTool,
+                color: penColor,
+                width: currentTool === 'pen' ? penSize : eraserSize,
+                started: false
+            };
+            touchPoints.set(t.identifier, p);
+            beginStroke(p);
+            saveUndoState();
+        }
+    }
+
+    function onTouchMove(e) {
+        e.preventDefault();
+
+        // 双指手势
+        if (e.touches.length >= 2 && pinchStart) {
+            const t1 = e.touches[0], t2 = e.touches[1];
+            const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+            const midX = (t1.clientX + t2.clientX) / 2;
+            const midY = (t1.clientY + t2.clientY) / 2;
+            let newScale = pinchStart.scale * (dist / pinchStart.dist);
+            newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, newScale));
+            const rect = canvas.getBoundingClientRect();
+            view.scale = newScale;
+            view.offsetX = (midX - rect.left) - pinchStart.worldMid.x * newScale;
+            view.offsetY = (midY - rect.top) - pinchStart.worldMid.y * newScale;
+            applyView();
+            refreshDisplay();
+            return;
+        }
+
+        for (let i = 0; i < e.touches.length; i++) {
+            const t = e.touches[i];
+
+            if (selectMode) {
+                if (dragImageInfo) {
+                    const world = getWorldFromEvent(t.clientX, t.clientY);
+                    dragImageInfo.img.x = dragImageInfo.startX0 + (world.x - dragImageInfo.startX);
+                    dragImageInfo.img.y = dragImageInfo.startY0 + (world.y - dragImageInfo.startY);
+                    refreshDisplay();
+                } else if (resizeImageInfo) {
+                    const world = getWorldFromEvent(t.clientX, t.clientY);
+                    const res = computeResize(resizeImageInfo, world.x, world.y);
+                    if (res) {
+                        resizeImageInfo.img.w = res.newW;
+                        resizeImageInfo.img.h = res.newH;
+                        resizeImageInfo.img.x = res.newX;
+                        resizeImageInfo.img.y = res.newY;
+                        refreshDisplay();
+                    }
+                } else if (isPanning) {
+                    view.offsetX = panStart.ox + (t.clientX - panStart.x);
+                    view.offsetY = panStart.oy + (t.clientY - panStart.y);
+                    applyView();
+                    refreshDisplay();
+                }
+                continue;
+            }
+
+            const p = touchPoints.get(t.identifier);
+            if (!p) continue;
+            const w = getWorldFromEvent(t.clientX, t.clientY);
+            p.x = w.x;
+            p.y = w.y;
+            continueStroke(p);
+            refreshDisplay();
+        }
+    }
+
+    function onTouchEnd(e) {
+        e.preventDefault();
+
+        if (selectMode) {
+            dragImageInfo = null;
+            resizeImageInfo = null;
+            isPanning = false;
+            if (e.touches.length < 2) pinchStart = null;
+            if (e.touches.length === 0) refreshDisplay();
+            return;
+        }
+
+        const stillOnScreen = new Set();
+        for (let i = 0; i < e.touches.length; i++) stillOnScreen.add(e.touches[i].identifier);
+
+        touchPoints.forEach((p, id) => {
+            if (!stillOnScreen.has(id)) {
+                endStroke(p);
+                touchPoints.delete(id);
+            }
+        });
+
+        if (e.touches.length < 2) pinchStart = null;
+        if (e.touches.length === 0) {
+            saveInkToMap();
+            refreshDisplay();
+        }
+    }
+
+
+    /* ============================================================
+       初始化
+    ============================================================ */
+    function initCanvas() {
+        canvas = document.getElementById('boardCanvas');
+        ctx = canvas.getContext('2d', { alpha: true });
+        resizeCanvas();
+        ensureInkCanvas();
+        refreshDisplay();
+
+        canvas.addEventListener('mousedown', onMouseDown);
+        canvas.addEventListener('mousemove', onMouseMove);
+        canvas.addEventListener('mouseup', onMouseUp);
+        canvas.addEventListener('mouseleave', onMouseUp);
+
+        canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+        canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+        canvas.addEventListener('touchend', onTouchEnd, { passive: false });
+        canvas.addEventListener('touchcancel', onTouchEnd, { passive: false });
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const factor = -e.deltaY > 0 ? 1.1 : 0.9;
+            zoomAt(e.clientX, e.clientY, factor);
+        }, { passive: false });
+    }
+
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        pagesInk.clear();
+        ensureInkCanvas();
+        restoreInkFromMap(currentPage);
+        refreshDisplay();
+    }
+
+
+    /* ============================================================
+       PPTX 解析
+    ============================================================ */
+    async function parsePPTX(file) {
+        try {
+            const zip = await JSZip.loadAsync(file);
+            const slideFiles = [];
+            for (let filename of Object.keys(zip.files)) {
+                if (filename.match(/ppt\/slides\/slide\d+\.xml$/)) {
+                    const num = parseInt(filename.match(/slide(\d+)\.xml/)[1]);
+                    slideFiles.push({ num, path: filename });
+                }
+            }
+            slideFiles.sort((a,b)=>a.num-b.num);
+            if (slideFiles.length === 0) throw new Error('未找到幻灯片');
+            const slidesText = [];
+            for (let slide of slideFiles) {
+                const xmlStr = await zip.file(slide.path).async('string');
+                const xmlDoc = new DOMParser().parseFromString(xmlStr, 'application/xml');
+                const textNodes = xmlDoc.querySelectorAll('a\\:t, p\\:t, t');
+                let text = '';
+                for (let node of textNodes) text += node.textContent + '\n';
+                slidesText.push(text.trim() || '（无文字）');
+            }
+            return { slidesText, total: slidesText.length };
+        } catch(err) {
+            alert('解析PPTX失败：' + err.message);
+            return null;
+        }
+    }
+
+    async function importPPTX(file) {
+        const result = await parsePPTX(file);
+        if (!result) return;
+        totalPages = result.total;
+        isPPTMode = true;
+        currentPage = 1;
+        pagesInk.clear();
+        pageImages.clear();
+        pageText.clear();
+        result.slidesText.forEach((text, i) => pageText.set(i+1, text));
+        restoreInkFromMap(1);
+        refreshDisplay();
+        updatePageUI();
+        alert(`成功导入PPTX，共 ${totalPages} 页（仅文本）`);
+    }
+
+
+    /* ============================================================
+       保存（黑底合成，修复擦除处变白）
+    ============================================================ */
+    function exportPageAsDataURL(page) {
+        const temp = document.createElement('canvas');
+        temp.width = canvas.width;
+        temp.height = canvas.height;
+        const tctx = temp.getContext('2d');
+        tctx.fillStyle = '#0f0f0f';
+        tctx.fillRect(0, 0, temp.width, temp.height);
+        (pageImages.get(page) || []).forEach(im => tctx.drawImage(im.img, im.x, im.y, im.w, im.h));
+        if (pageText.has(page)) {
+            tctx.save();
+            tctx.fillStyle = '#ffffff';
+            tctx.font = '32px "Segoe UI", Roboto, sans-serif';
+            tctx.textBaseline = 'top';
+            tctx.shadowColor = 'rgba(0,0,0,0.8)';
+            tctx.shadowBlur = 6;
+            wrapText(tctx, pageText.get(page), 60, 80, temp.width - 120, 44);
+            tctx.restore();
+        }
+        const ink = pagesInk.get(page);
+        if (ink) {
+            const tmpInk = document.createElement('canvas');
+            tmpInk.width = temp.width;
+            tmpInk.height = temp.height;
+            tmpInk.getContext('2d').putImageData(ink, 0, 0);
+            tctx.drawImage(tmpInk, 0, 0);
+        }
+        return temp.toDataURL('image/png');
+    }
+
+    function saveSinglePage() {
+        saveInkToMap();
+        const dataURL = exportPageAsDataURL(currentPage);
+        const link = document.createElement('a');
+        link.download = `HL5-${currentPage}页.png`;
+        link.href = dataURL;
+        link.click();
+    }
+
+    async function saveAllPagesAsZip() {
+        if (!window.JSZip) { alert('JSZip未加载'); return; }
+        saveInkToMap();
+        const zip = new JSZip();
+        for (let page = 1; page <= totalPages; page++) {
+            const dataURL = exportPageAsDataURL(page);
+            const base64 = dataURL.split(',')[1];
+            zip.file(`第${page}页.png`, base64, { base64: true });
+        }
+        const content = await zip.generateAsync({ type: 'blob' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(content);
+        a.download = `HL5全页.zip`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+
+    /* ============================================================
+       帮助
+    ============================================================ */
+    function copyEmail() {
+        const email = 'Ineedyourhelpofweb@163.com';
+        const done = () => {
+            const box = document.getElementById('emailBox');
+            box.classList.add('copied');
+            box.innerHTML = '✅ 已复制到剪贴板！';
+            setTimeout(() => {
+                box.classList.remove('copied');
+                box.innerHTML = '📧 Ineedyourhelpofweb@163.com';
+            }, 2000);
+        };
+        navigator.clipboard.writeText(email).then(done).catch(() => {
+            const ta = document.createElement('textarea');
+            ta.value = email;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            done();
+        });
+    }
+    function closeHelp() { helpModal.classList.remove('show'); }
+
+    function beforeUnloadHandler(e) {
+        e.preventDefault();
+        e.returnValue = '如果您有重要内容，记得先保存哦～';
+        return e.returnValue;
+    }
+
+
+    /* ============================================================
+       UI 绑定
+    ============================================================ */
+    function bindUIEvents() {
+        menuBtn.onclick = (e) => {
+            e.stopPropagation();
+            closeAllPopups();
+            menuPanel.classList.toggle('show');
+        };
+        stageBtn.onclick = (e) => {
+            e.stopPropagation();
+            window.open('stage.html', 'hl5_stage');
+        };
+
+        document.querySelectorAll('.menu-item[data-action]').forEach(item => {
+            item.onclick = (e) => {
+                e.stopPropagation();
+                const action = item.dataset.action;
+                switch(action) {
+                    case 'saveSingle': saveSinglePage(); break;
+                    case 'saveAll': saveAllPagesAsZip(); break;
+                    case 'open': {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = '.pptx';
+                        input.onchange = async (ev) => { if(ev.target.files[0]) await importPPTX(ev.target.files[0]); };
+                        input.click();
+                        break;
+                    }
+                    case 'help': helpModal.classList.add('show'); break;
+                    case 'about': alert('HL5白班 授课助手 v7.0.0\n支持PPTX、多指书写、缩放平移、展台联动、图片自由缩放'); break;
+                }
+                menuPanel.classList.remove('show');
+            };
+        });
+        document.addEventListener('click', (e) => {
+            if (!menuPanel.contains(e.target) && e.target !== menuBtn) menuPanel.classList.remove('show');
+        });
+
+        selectBtn.onclick = () => {
+            selectMode = !selectMode;
+            selectBtn.classList.toggle('active', selectMode);
+            if (selectMode) {
+                canvas.style.cursor = 'grab';
+                penBtn.classList.remove('active');
+                eraserBtn.classList.remove('active');
+            } else {
+                canvas.style.cursor = 'crosshair';
+                selectedImageId = null;
+                refreshDisplay();
+            }
+        };
+
+        penBtn.onclick = () => {
+            currentTool = 'pen'; selectMode = false;
+            selectBtn.classList.remove('active');
+            penBtn.classList.add('active'); eraserBtn.classList.remove('active');
+            canvas.style.cursor = 'crosshair';
+            closeAllPopups();
+        };
+        penBtn.ondblclick = (e) => { e.stopPropagation(); penPopup.classList.toggle('show'); eraserPopup.classList.remove('show'); };
+
+        eraserBtn.onclick = () => {
+            currentTool = 'eraser'; selectMode = false;
+            selectBtn.classList.remove('active');
+            eraserBtn.classList.add('active'); penBtn.classList.remove('active');
+            canvas.style.cursor = 'crosshair';
+            closeAllPopups();
+        };
+        eraserBtn.ondblclick = (e) => { e.stopPropagation(); eraserPopup.classList.toggle('show'); penPopup.classList.remove('show'); };
+
+        document.querySelectorAll('.color-option').forEach(opt => {
+            opt.onclick = () => {
+                penColor = opt.dataset.color;
+                currentTool = 'pen';
+                penBtn.classList.add('active'); eraserBtn.classList.remove('active');
+                penPopup.classList.remove('show');
+            };
+        });
+        penSizeInput.oninput = (e) => { penSize = parseInt(e.target.value); };
+        eraserSizeInput.oninput = (e) => {
+            const val = parseInt(e.target.value);
+            eraserSize = val;
+            if (val >= 100) { clearInk(); eraserSizeInput.value = 20; eraserSize = 20; }
+        };
+
+        undoBtn.onclick = () => undo();
+
+        zoomInBtn.onclick = () => zoomAt(window.innerWidth/2, window.innerHeight/2, 1.2);
+        zoomOutBtn.onclick = () => zoomAt(window.innerWidth/2, window.innerHeight/2, 0.8);
+        zoomResetBtn.onclick = () => {
+            view.scale = 1; view.offsetX = 0; view.offsetY = 0;
+            applyView(); refreshDisplay();
+        };
+
+        prevBtn.onclick = () => { if(currentPage>1) switchPage(currentPage-1); };
+        nextBtn.onclick = () => {
+            if(isPPTMode) { if(currentPage<totalPages) switchPage(currentPage+1); }
+            else { if(currentPage>=totalPages) addNewPage(); else switchPage(currentPage+1); }
+        };
+        pageInd.onclick = (e) => {
+            e.stopPropagation();
+            thumbPanel.classList.toggle('show');
+            thumbPanel.innerHTML = '';
+            for(let i=1;i<=totalPages;i++){
+                const div = document.createElement('div');
+                div.className = 'thumb-item' + (i===currentPage?' active':'');
+                div.innerText = `第${i}页`;
+                div.onclick = () => { switchPage(i); thumbPanel.classList.remove('show'); };
+                thumbPanel.appendChild(div);
+            }
+        };
+        document.addEventListener('click', (e) => {
+            if(!thumbPanel.contains(e.target) && e.target !== pageInd) thumbPanel.classList.remove('show');
+        });
+
+        helpModal.addEventListener('click', (e) => { if (e.target === helpModal) closeHelp(); });
+        window.addEventListener('beforeunload', beforeUnloadHandler);
+        window.addEventListener('resize', resizeCanvas);
+    }
+
+    window.copyEmail = copyEmail;
+    window.closeHelp = closeHelp;
+
+})();
+</script>
+</body>
+</html>
