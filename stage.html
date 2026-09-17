@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>HL5展台 · 授课助手</title>
+    <title>HL5展台 · 授课助手 v7.0.0</title>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; user-select:none; -webkit-tap-highlight-color:transparent; }
         html, body {
@@ -12,7 +12,6 @@
             color:white;
         }
 
-        /* 摄像头预览层 */
         #previewWrap {
             position:absolute; top:0; left:0;
             width:100%; height:100%;
@@ -33,19 +32,19 @@
         }
         #photoPreview.active { display:block; }
 
-        /* 左侧竖向抽屉（照片列表） */
+        /* 左侧竖向抽屉 */
         .left-drawer {
             position:absolute; left:0; top:0;
             height:100%; width:140px;
             display:flex; flex-direction:column;
-            justify-content:flex-end;       /* 从下往上堆 */
+            justify-content:flex-end;
             padding:16px 8px;
             z-index:20;
             pointer-events:none;
             background:linear-gradient(to right, rgba(0,0,0,0.5), transparent);
         }
         .thumbs-scroll {
-            display:flex; flex-direction:column-reverse;  /* 最新的在最上面 */
+            display:flex; flex-direction:column-reverse;
             gap:10px;
             max-height:70vh;
             overflow-y:auto;
@@ -83,7 +82,6 @@
             transform:scale(1.03);
         }
 
-        /* 抽屉最下方：继续拍照按钮 */
         .continue-camera-btn {
             margin-top:12px;
             background:#1FAA59;
@@ -93,7 +91,7 @@
             padding:12px 8px;
             border-radius:12px;
             cursor:pointer;
-            display:flex;
+            display:none;
             flex-direction:column;
             align-items:center;
             gap:6px;
@@ -103,10 +101,10 @@
             transition:0.2s;
             flex-shrink:0;
         }
+        .continue-camera-btn.show { display:flex; }
         .continue-camera-btn:active { transform:scale(0.95); background:#189c4f; }
         .continue-camera-btn svg { width:22px; height:22px; fill:white; }
 
-        /* 底部拍照大按钮 */
         .capture-btn-wrap {
             position:absolute;
             bottom:26px; left:50%; transform:translateX(-50%);
@@ -150,6 +148,28 @@
         }
         .back-btn:active { background:#3f3f3f; }
 
+        /* 切换摄像头（左下角，返回白板右边） */
+        .switch-camera-btn {
+            position:absolute;
+            bottom:26px; left:160px;
+            z-index:30;
+            background:rgba(30,30,30,0.85);
+            backdrop-filter:blur(6px);
+            border:1px solid #555;
+            color:white;
+            padding:12px 18px;
+            border-radius:40px;
+            font-size:1rem;
+            cursor:pointer;
+            display:none;
+            align-items:center; gap:8px;
+            transition:0.2s;
+            box-shadow:0 4px 14px rgba(0,0,0,0.5);
+            white-space:nowrap;
+        }
+        .switch-camera-btn.show { display:flex; }
+        .switch-camera-btn:active { background:#3f3f3f; }
+
         /* 右下角：添加到白板 */
         .send-btn-wrap {
             position:absolute;
@@ -181,26 +201,59 @@
             transform:scale(1.05);
         }
 
-        /* 右上角：切换摄像头 */
-        .switch-camera-btn {
-            position:absolute;
-            top:20px; right:20px;
-            z-index:30;
-            background:rgba(30,30,30,0.8);
-            border:1px solid #555;
-            color:white;
-            width:48px; height:48px;
-            border-radius:50%;
-            font-size:1.4rem;
-            cursor:pointer;
+        /* 摄像头列表弹窗 */
+        .camera-list-modal {
+            position:fixed; top:0; left:0; width:100%; height:100%;
+            background:rgba(0,0,0,0.7);
             display:none;
             align-items:center; justify-content:center;
-            transition:0.2s;
+            z-index:200;
         }
-        .switch-camera-btn.show { display:flex; }
-        .switch-camera-btn:active { background:#3f3f3f; }
+        .camera-list-modal.show { display:flex; }
+        .camera-list-content {
+            background:#2d2d2d;
+            border:1px solid #555;
+            border-radius:20px;
+            padding:20px 0;
+            min-width:260px;
+            max-width:90vw;
+            box-shadow:0 20px 60px rgba(0,0,0,0.8);
+        }
+        .camera-list-title {
+            padding:0 20px 14px;
+            font-size:1.1rem;
+            font-weight:600;
+            color:#1FAA59;
+            border-bottom:1px solid #3f3f3f;
+            margin-bottom:8px;
+        }
+        .camera-list-item {
+            padding:14px 20px;
+            color:#eee;
+            font-size:1rem;
+            cursor:pointer;
+            display:flex; align-items:center; justify-content:space-between;
+            gap:10px;
+            transition:background 0.15s;
+        }
+        .camera-list-item:active { background:#3f3f3f; }
+        .camera-list-item.active { color:#1FAA59; font-weight:600; }
+        .camera-list-item.active::after {
+            content:'✓';
+            color:#1FAA59;
+            font-size:1.2rem;
+        }
+        .camera-list-cancel {
+            margin-top:10px;
+            padding:12px 20px;
+            text-align:center;
+            color:#888;
+            font-size:0.95rem;
+            cursor:pointer;
+            border-top:1px solid #3f3f3f;
+        }
+        .camera-list-cancel:active { background:#3f3f3f; }
 
-        /* 顶部提示条 */
         .toast {
             position:absolute;
             top:20px; left:50%; transform:translateX(-50%) translateY(-100px);
@@ -217,7 +270,6 @@
         }
         .toast.show { transform:translateX(-50%) translateY(0); }
 
-        /* 空状态提示 */
         .empty-tip {
             position:absolute;
             top:50%; left:50%; transform:translate(-50%,-50%);
@@ -230,80 +282,74 @@
         }
         .empty-tip.hide { display:none; }
 
-        /* 手机适配 */
         @media (max-width:600px) {
             .left-drawer { width:100px; padding:12px 6px; }
             .thumb-item { border-radius:8px; }
             .capture-btn { width:66px; height:66px; }
             .capture-btn::after { width:48px; height:48px; }
             .send-btn { padding:12px 20px; font-size:1rem; }
-            .back-btn { padding:10px 16px; font-size:0.9rem; }
+            .back-btn { padding:10px 14px; font-size:0.9rem; }
+            .switch-camera-btn { left:auto; right:20px; bottom:88px; padding:10px 14px; font-size:0.9rem; }
             .continue-camera-btn { font-size:0.75rem; padding:10px 6px; }
         }
     </style>
 </head>
 <body>
 
-    <!-- 摄像头预览 -->
     <div id="previewWrap">
         <video id="cameraVideo" autoplay playsinline muted></video>
         <img id="photoPreview" alt="预览">
     </div>
 
-    <!-- 空状态提示 -->
     <div class="empty-tip" id="emptyTip">
         📷 点击下方按钮拍照<br>
         照片会出现在左侧列表
     </div>
 
-    <!-- 左侧照片抽屉 -->
     <div class="left-drawer">
         <div class="thumbs-scroll" id="thumbsScroll"></div>
-        <button class="continue-camera-btn" id="continueCameraBtn" style="display:none;">
+        <button class="continue-camera-btn" id="continueCameraBtn">
             <svg viewBox="0 0 24 24"><path d="M12 15.2a3.2 3.2 0 100-6.4 3.2 3.2 0 000 6.4zM9 2L7.17 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2h-3.17L15 2H9zm3 15a5 5 0 110-10 5 5 0 010 10z"/></svg>
             继续拍照
         </button>
     </div>
 
-    <!-- 底部拍照按钮 -->
     <div class="capture-btn-wrap">
         <div class="capture-btn" id="captureBtn"></div>
     </div>
 
-    <!-- 左下角返回白板 -->
     <button class="back-btn" id="backBtn">
         ◀ 返回白板
     </button>
 
-    <!-- 右下角添加到白板 -->
+    <button class="switch-camera-btn" id="switchCameraBtn" title="切换摄像头">
+        🔄 切换摄像头
+    </button>
+
     <div class="send-btn-wrap">
         <button class="send-btn" id="sendBtn" disabled>
             ➕ 添加到白板
         </button>
     </div>
 
-    <!-- 右上角切换摄像头 -->
-    <button class="switch-camera-btn" id="switchCameraBtn" title="切换摄像头">
-        🔄
-    </button>
+    <div class="camera-list-modal" id="cameraListModal">
+        <div class="camera-list-content">
+            <div class="camera-list-title">📷 选择摄像头</div>
+            <div id="cameraListItems"></div>
+            <div class="camera-list-cancel" id="cameraListCancel">取消</div>
+        </div>
+    </div>
 
-    <!-- 顶部提示 -->
     <div class="toast" id="toast"></div>
 
 <script>
 (function(){
     'use strict';
 
-    // ========== 频道通信 ==========
     const CHANNEL_NAME = 'hl5-whiteboard';
     let channel = null;
-    try {
-        channel = new BroadcastChannel(CHANNEL_NAME);
-    } catch (e) {
-        console.warn('BroadcastChannel 不可用，降级到 localStorage');
-    }
+    try { channel = new BroadcastChannel(CHANNEL_NAME); } catch (e) {}
 
-    // 降级方案：localStorage
     function sendToWhiteboard(data) {
         if (channel) {
             channel.postMessage({ type: 'stage-image', data: data, time: Date.now() });
@@ -312,28 +358,27 @@
         }
     }
 
-    // ========== DOM ==========
     const cameraVideo = document.getElementById('cameraVideo');
     const photoPreview = document.getElementById('photoPreview');
     const thumbsScroll = document.getElementById('thumbsScroll');
     const continueCameraBtn = document.getElementById('continueCameraBtn');
     const captureBtn = document.getElementById('captureBtn');
     const backBtn = document.getElementById('backBtn');
-    const sendBtn = document.getElementById('sendBtn');
     const switchCameraBtn = document.getElementById('switchCameraBtn');
+    const sendBtn = document.getElementById('sendBtn');
     const toast = document.getElementById('toast');
     const emptyTip = document.getElementById('emptyTip');
+    const cameraListModal = document.getElementById('cameraListModal');
+    const cameraListItems = document.getElementById('cameraListItems');
+    const cameraListCancel = document.getElementById('cameraListCancel');
 
-    // ========== 状态 ==========
     let cameraStream = null;
     let videoDevices = [];
-    let currentDeviceIndex = 0;
-    let photos = [];               // [{ id, dataUrl }]
+    let currentDeviceId = null;
+    let photos = [];
     let selectedPhotoId = null;
-    let showingCamera = true;      // true=摄像头预览, false=照片预览
     let captureCanvas = null;
 
-    // ========== Toast ==========
     let toastTimer = null;
     function showToast(msg, duration = 1800) {
         toast.textContent = msg;
@@ -342,7 +387,6 @@
         toastTimer = setTimeout(() => toast.classList.remove('show'), duration);
     }
 
-    // ========== 摄像头 ==========
     async function updateVideoDevices() {
         if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
         try {
@@ -361,16 +405,16 @@
         }
         const constraints = {
             video: deviceId
-                ? { deviceId: { exact: deviceId }, facingMode: 'environment' }
+                ? { deviceId: { exact: deviceId } }
                 : { facingMode: 'environment' }
         };
         try {
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
             cameraStream = stream;
             cameraVideo.srcObject = stream;
+            currentDeviceId = deviceId || null;
             await cameraVideo.play().catch(() => {});
         } catch (err) {
-            // 如果 environment 失败，尝试任意摄像头
             try {
                 const stream2 = await navigator.mediaDevices.getUserMedia({ video: true });
                 cameraStream = stream2;
@@ -383,21 +427,40 @@
         await updateVideoDevices();
     }
 
-    async function switchCamera() {
-        if (videoDevices.length < 2) return;
-        currentDeviceIndex = (currentDeviceIndex + 1) % videoDevices.length;
-        await startCamera(videoDevices[currentDeviceIndex].deviceId);
+    function openCameraList() {
+        if (videoDevices.length === 0) {
+            showToast('未检测到可用摄像头');
+            return;
+        }
+        cameraListItems.innerHTML = '';
+        videoDevices.forEach((device, idx) => {
+            const item = document.createElement('div');
+            item.className = 'camera-list-item';
+            if (device.deviceId === currentDeviceId || (!currentDeviceId && idx === 0)) {
+                item.classList.add('active');
+            }
+            let label = device.label || `摄像头 ${idx + 1}`;
+            item.textContent = label;
+            item.addEventListener('click', async () => {
+                closeCameraList();
+                await startCamera(device.deviceId);
+                showToast('已切换：' + label);
+            });
+            cameraListItems.appendChild(item);
+        });
+        cameraListModal.classList.add('show');
     }
 
-    // ========== 拍照 ==========
+    function closeCameraList() {
+        cameraListModal.classList.remove('show');
+    }
+
     function capturePhoto() {
         if (!cameraVideo.videoWidth) {
             showToast('摄像头未就绪');
             return;
         }
-        if (!captureCanvas) {
-            captureCanvas = document.createElement('canvas');
-        }
+        if (!captureCanvas) captureCanvas = document.createElement('canvas');
         captureCanvas.width = cameraVideo.videoWidth;
         captureCanvas.height = cameraVideo.videoHeight;
         const cctx = captureCanvas.getContext('2d');
@@ -405,18 +468,12 @@
 
         const dataUrl = captureCanvas.toDataURL('image/jpeg', 0.85);
         const id = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
-
         photos.unshift({ id, dataUrl });
-
-        // 添加缩略图
         addThumbnail(id, dataUrl);
 
-        // 显示继续拍照按钮
-        continueCameraBtn.style.display = 'flex';
+        continueCameraBtn.classList.add('show');
         emptyTip.classList.add('hide');
-
         showToast('📸 拍照成功');
-        // 保持摄像头预览（老师可以继续拍）
     }
 
     function addThumbnail(id, dataUrl) {
@@ -427,49 +484,25 @@
         img.src = dataUrl;
         div.appendChild(img);
         div.addEventListener('click', () => selectPhoto(id));
-        // 插到最前面（视觉上因为 flex-direction: column-reverse，会显示在底部？）
-        // 用 column-reverse 时，DOM 中第一个元素显示在最下面，最后一个显示在最上面。
-        // 我们希望最新的显示在最上面，所以 appendChild 插到末尾。
         thumbsScroll.appendChild(div);
-        // 但 column-reverse 中最新添加的会出现在最上面（因为 reverse 了顺序）
-        // 实际上 column-reverse 让视觉顺序与 DOM 顺序相反，所以 appendChild 后它在视觉上是顶部第一个。
     }
 
-    // ========== 选择照片 ==========
     function selectPhoto(id) {
         const photo = photos.find(p => p.id === id);
         if (!photo) return;
         selectedPhotoId = id;
-
-        // 更新缩略图选中样式
         document.querySelectorAll('.thumb-item').forEach(el => {
             el.classList.toggle('active', el.dataset.id === id);
         });
-
-        // 显示照片预览
         photoPreview.src = photo.dataUrl;
         photoPreview.classList.add('active');
-        showingCamera = false;
-
-        // 启用发送按钮
         sendBtn.disabled = false;
     }
 
-    // ========== 继续拍照 ==========
     function resumeCamera() {
         photoPreview.classList.remove('active');
-        showingCamera = true;
-        // 不取消选中状态，老师可以再次点击缩略图回到照片
-        // 但发送按钮应保持之前的可用状态？
-        // 逻辑：如果已经选过照片，继续拍照不取消选中，但主体回到摄像头。
-        // 老师如果想发送，还需要再点一次缩略图或者直接点发送也行。
-        // 我们保留选中状态，发送按钮保持启用。
-        if (selectedPhotoId) {
-            sendBtn.disabled = false;
-        }
     }
 
-    // ========== 发送到白板 ==========
     function sendSelectedToWhiteboard() {
         if (!selectedPhotoId) {
             showToast('请先选择一张照片');
@@ -477,7 +510,6 @@
         }
         const photo = photos.find(p => p.id === selectedPhotoId);
         if (!photo) return;
-
         sendToWhiteboard(photo.dataUrl);
         showToast('✅ 已发送到白板');
         sendBtn.classList.add('sent');
@@ -488,39 +520,32 @@
         }, 1500);
     }
 
-    // ========== 返回白板 ==========
     function backToWhiteboard() {
-        // 优先通过 BroadcastChannel 通知白板页聚焦
-        if (channel) {
-            channel.postMessage({ type: 'focus-whiteboard' });
-        }
-        // 尝试关闭当前标签（有些浏览器不允许非脚本打开的窗口关闭）
+        if (channel) channel.postMessage({ type: 'focus-whiteboard' });
         window.close();
-        // 如果关不掉，给个提示
-        setTimeout(() => {
-            showToast('请手动切换回白板页');
-        }, 300);
+        setTimeout(() => showToast('请手动切换回白板页'), 300);
     }
 
-    // ========== 事件绑定 ==========
     captureBtn.addEventListener('click', capturePhoto);
     continueCameraBtn.addEventListener('click', resumeCamera);
     sendBtn.addEventListener('click', sendSelectedToWhiteboard);
     backBtn.addEventListener('click', backToWhiteboard);
-    switchCameraBtn.addEventListener('click', switchCamera);
+    switchCameraBtn.addEventListener('click', openCameraList);
+    cameraListCancel.addEventListener('click', closeCameraList);
+    cameraListModal.addEventListener('click', (e) => {
+        if (e.target === cameraListModal) closeCameraList();
+    });
 
-    // ========== 启动 ==========
     (async function init() {
         await startCamera();
-        // 首次加载时列出摄像头
         await updateVideoDevices();
+        if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+            navigator.mediaDevices.addEventListener('devicechange', updateVideoDevices);
+        }
     })();
 
-    // 页面卸载时停止摄像头
     window.addEventListener('beforeunload', () => {
-        if (cameraStream) {
-            cameraStream.getTracks().forEach(t => t.stop());
-        }
+        if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
     });
 
 })();
